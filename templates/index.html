@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Catanalyst &mdash; Smart Catan Setup Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <div>
+          <h1>Catanalyst</h1>
+          <p>Design a valid Catan board and reveal the smartest settlement spots.</p>
+        </div>
+        <button class="primary" id="analyze-button" type="button" title="Run settlement analysis">
+          Analyze Settlements
+        </button>
+      </header>
+
+      <main class="main-grid">
+        <section class="board-section">
+          <div class="board" id="board">
+            {% for row in rows %}
+            <div class="board-row" data-row="{{ row.row }}">
+              {% for tile in row.tiles %}
+              <button
+                type="button"
+                class="hex-tile"
+                data-tile="{{ tile.id }}"
+                data-q="{{ tile.q }}"
+                data-r="{{ tile.r }}"
+              >
+                <span class="tile-label">{{ tile.display }}</span>
+                <span class="tile-resource" data-role="resource">Choose</span>
+                <span class="tile-token" data-role="token">&nbsp;</span>
+              </button>
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="controls-section">
+          <div class="panel" id="selection-panel">
+            <h2 class="panel-title">Select a tile</h2>
+            <p class="panel-subtitle">
+              Click any hex on the board to assign a terrain and number token.
+            </p>
+            <div class="panel-form">
+              <label class="field">
+                <span>Terrain resource</span>
+                <select id="resource-select">
+                  <option value="" data-placeholder>Select resource</option>
+                  {% for resource, limit in resource_limits.items() %}
+                  <option value="{{ resource }}">{{ resource.title() }} ({{ limit }})</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="field">
+                <span>Number token</span>
+                <select id="token-select">
+                  <option value="" data-placeholder>Select token</option>
+                  {% for token, limit in token_limits.items() %}
+                  <option value="{{ token }}">{{ token }} &times; {{ limit }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <div class="panel-actions">
+                <button id="apply-selection" class="primary" type="button">Apply to tile</button>
+                <button id="clear-selection" class="ghost" type="button">Clear tile</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel compact">
+            <h3>Board progress</h3>
+            <div class="panel-columns">
+              <div>
+                <h4>Resources</h4>
+                <ul class="counter-list" id="resource-counts">
+                  {% for resource, limit in resource_limits.items() %}
+                  <li data-resource="{{ resource }}">
+                    <span class="label">{{ resource.title() }}</span>
+                    <span class="value">0 / {{ limit }}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+              <div>
+                <h4>Number tokens</h4>
+                <ul class="counter-list" id="token-counts">
+                  {% for token, limit in token_limits.items() %}
+                  <li data-token="{{ token }}">
+                    <span class="label">{{ token }}</span>
+                    <span class="value">0 / {{ limit }}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel compact" id="message-panel" hidden>
+            <h3>Validation</h3>
+            <ul class="message-list" id="messages"></ul>
+          </div>
+        </section>
+      </main>
+
+      <section class="results" id="results" aria-live="polite">
+        <div class="results-empty" id="results-empty">
+          <h2>Your strategic assistant</h2>
+          <p>
+            Once your board is complete and valid, you'll see the highest-value intersections
+            and the best opening settlement pairs based on probability and resource coverage.
+          </p>
+        </div>
+        <div class="results-grid" id="results-grid" hidden>
+          <div class="result-card">
+            <h2>Top settlement spots</h2>
+            <ol id="top-vertices"></ol>
+          </div>
+          <div class="result-card">
+            <h2>Best starting pairs</h2>
+            <ol id="top-pairs"></ol>
+          </div>
+        </div>
+      </section>
+
+      <footer class="page-footer">
+        <p>
+          Crafted with ❤️ to make your Settlers of Catan openings smarter. Adjust placements freely
+          and rerun the analysis as you experiment.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      window.CATAN_CONFIG = {
+        resourceLimits: {{ resource_limits|tojson }},
+        tokenLimits: {{ token_limits|tojson }},
+        tileCount: {{ tile_count }},
+      };
+    </script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  </body>
+</html>
