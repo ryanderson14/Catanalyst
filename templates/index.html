@@ -15,111 +15,75 @@
   <body>
     <div class="page">
       <header class="page-header">
-        <div>
+        <div class="page-header__copy">
           <h1>Catanalyst</h1>
-          <p>Design a valid Catan board and reveal the smartest settlement spots.</p>
+          <p>Design a legal Settlers of Catan board and pinpoint the smartest opening settlements.</p>
+          <p class="page-header__hint">
+            Hover or tap any hex to open the tile editor. Pick a terrain, then choose its number token &mdash;
+            we'll guard the official counts automatically.
+          </p>
         </div>
-        <button class="primary" id="analyze-button" type="button" title="Run settlement analysis">
-          Analyze Settlements
-        </button>
+        <div class="page-header__actions">
+          <button class="primary" id="analyze-button" type="button" title="Run settlement analysis">
+            Analyze settlements
+          </button>
+        </div>
       </header>
 
-      <main class="main-grid">
+      <main class="main-layout">
         <section class="board-section">
-          <div class="board" id="board">
-            {% for row in rows %}
-            <div class="board-row" data-row="{{ row.row }}">
-              {% for tile in row.tiles %}
+          <div class="board-frame">
+            <div
+              class="board-canvas"
+              id="board"
+              role="application"
+              aria-label="Interactive Catan board editor"
+            >
+              {% for tile in tiles %}
               <button
                 type="button"
-                class="hex-tile"
+                class="hex-tile empty"
                 data-tile="{{ tile.id }}"
                 data-q="{{ tile.q }}"
                 data-r="{{ tile.r }}"
               >
-                <span class="tile-label">{{ tile.display }}</span>
-                <span class="tile-resource" data-role="resource">Choose</span>
-                <span class="tile-token" data-role="token">&nbsp;</span>
+                <span class="tile-label">#{{ tile.display }}</span>
+                <span class="tile-resource" data-role="resource">Click to choose</span>
+                <span class="tile-token" data-role="token"></span>
               </button>
               {% endfor %}
             </div>
-            {% endfor %}
           </div>
         </section>
-
-        <section class="controls-section">
-          <div class="panel" id="selection-panel">
-            <h2 class="panel-title">Select a tile</h2>
-            <p class="panel-subtitle">
-              Click any hex on the board to assign a terrain and number token.
+        <aside class="side-panel">
+          <div class="card">
+            <h2>How it works</h2>
+            <p>
+              Click a hex to open the tile editor. Choose a terrain tile and, if applicable, its number token.
+              Limits for resources and numbers are enforced automatically so every configuration stays legal.
             </p>
-            <div class="panel-form">
-              <label class="field">
-                <span>Terrain resource</span>
-                <select id="resource-select">
-                  <option value="" data-placeholder>Select resource</option>
-                  {% for resource, limit in resource_limits.items() %}
-                  <option value="{{ resource }}">{{ resource.title() }} ({{ limit }})</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label class="field">
-                <span>Number token</span>
-                <select id="token-select">
-                  <option value="" data-placeholder>Select token</option>
-                  {% for token, limit in token_limits.items() %}
-                  <option value="{{ token }}">{{ token }} &times; {{ limit }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-              <div class="panel-actions">
-                <button id="apply-selection" class="primary" type="button">Apply to tile</button>
-                <button id="clear-selection" class="ghost" type="button">Clear tile</button>
-              </div>
-            </div>
+            <p>
+              Want inspiration? Generate a balanced board instantly and tweak any pieces before running the
+              analysis.
+            </p>
           </div>
-
-          <div class="panel compact">
-            <h3>Board progress</h3>
-            <div class="panel-columns">
-              <div>
-                <h4>Resources</h4>
-                <ul class="counter-list" id="resource-counts">
-                  {% for resource, limit in resource_limits.items() %}
-                  <li data-resource="{{ resource }}">
-                    <span class="label">{{ resource.title() }}</span>
-                    <span class="value">0 / {{ limit }}</span>
-                  </li>
-                  {% endfor %}
-                </ul>
-              </div>
-              <div>
-                <h4>Number tokens</h4>
-                <ul class="counter-list" id="token-counts">
-                  {% for token, limit in token_limits.items() %}
-                  <li data-token="{{ token }}">
-                    <span class="label">{{ token }}</span>
-                    <span class="value">0 / {{ limit }}</span>
-                  </li>
-                  {% endfor %}
-                </ul>
-              </div>
-            </div>
+          <div class="card actions-card">
+            <button id="randomize-button" type="button" class="secondary">Random valid board</button>
+            <button id="clear-board" type="button" class="ghost">Clear all tiles</button>
           </div>
-
-          <div class="panel compact" id="message-panel" hidden>
-            <h3>Validation</h3>
+          <div class="card" id="message-panel" hidden>
+            <h2>Validation</h2>
             <ul class="message-list" id="messages"></ul>
           </div>
-        </section>
+        </aside>
       </main>
 
       <section class="results" id="results" aria-live="polite">
         <div class="results-empty" id="results-empty">
           <h2>Your strategic assistant</h2>
           <p>
-            Once your board is complete and valid, you'll see the highest-value intersections
-            and the best opening settlement pairs based on probability and resource coverage.
+            Complete the board and press <strong>Analyze settlements</strong> to surface the strongest
+            intersections plus the best opening settlement pairs by probability and resource coverage.
           </p>
         </div>
         <div class="results-grid" id="results-grid" hidden>
@@ -136,10 +100,49 @@
 
       <footer class="page-footer">
         <p>
-          Crafted with ❤️ to make your Settlers of Catan openings smarter. Adjust placements freely
-          and rerun the analysis as you experiment.
+          Crafted with ❤️ to make your Catan openings smarter. Experiment freely &mdash; the assistant keeps
+          every board configuration within the official rules.
         </p>
       </footer>
+    </div>
+
+    <div class="editor-overlay hidden" id="tile-editor" role="dialog" aria-modal="true">
+      <div class="editor-panel" role="document">
+        <button class="editor-close" id="close-editor" type="button" aria-label="Close tile editor">
+          &times;
+        </button>
+        <h2 id="tile-editor-title">Tile <span id="editor-tile-number"></span></h2>
+        <p class="editor-hint" id="editor-hint">Select a terrain for this hex.</p>
+
+        <div class="editor-section">
+          <h3>Terrain</h3>
+          <div class="option-grid" id="resource-options">
+            {% for resource, limit in resource_limits.items() %}
+            <button type="button" class="option-chip" data-resource="{{ resource }}">
+              <span class="option-name">{{ resource.title() }}</span>
+              <span class="option-remaining" data-role="remaining">{{ limit }} left</span>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="editor-section" id="token-section">
+          <h3>Number token</h3>
+          <div class="option-grid token-grid" id="token-options">
+            {% for token, limit in token_limits.items() %}
+            <button type="button" class="option-chip" data-token="{{ token }}">
+              <span class="option-name">{{ token }}</span>
+              <span class="option-remaining" data-role="remaining">{{ limit }} left</span>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="editor-actions">
+          <button type="button" class="primary" id="save-tile">Save tile</button>
+          <button type="button" class="ghost" id="clear-tile">Remove terrain</button>
+        </div>
+      </div>
     </div>
 
     <script>

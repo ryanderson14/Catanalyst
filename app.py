@@ -1,4 +1,5 @@
 import math
+import random
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
@@ -243,25 +244,49 @@ def evaluate_vertices(tiles: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
     return top_vertices, top_pairs
 
 
+def generate_random_board() -> List[Dict]:
+    resource_pool: List[str] = []
+    for resource, count in RESOURCE_LIMITS.items():
+        resource_pool.extend([resource] * count)
+
+    token_pool: List[int] = []
+    for token, count in TOKEN_LIMITS.items():
+        token_pool.extend([token] * count)
+
+    random.shuffle(resource_pool)
+    random.shuffle(token_pool)
+
+    tiles: List[Dict] = []
+    token_index = 0
+    for idx, resource in enumerate(resource_pool):
+        token = None
+        if resource != "desert":
+            token = token_pool[token_index]
+            token_index += 1
+        tiles.append({"id": idx, "resource": resource, "token": token})
+
+    return tiles
+
+
 @app.route("/")
 def index():
-    rows = []
-    for r in HEX_ROW_ORDER:
-        row_tile_indices = HEX_ROWS[r]
-        rows.append({
-            "row": r,
-            "tiles": [
-                {"id": idx, "display": idx + 1, "q": HEX_COORDS[idx][0], "r": HEX_COORDS[idx][1]}
-                for idx in row_tile_indices
-            ],
-        })
+    tiles = [
+        {"id": idx, "display": idx + 1, "q": coord[0], "r": coord[1]}
+        for idx, coord in enumerate(HEX_COORDS)
+    ]
     return render_template(
         "index.html",
-        rows=rows,
+        tiles=tiles,
         resource_limits=RESOURCE_LIMITS,
         token_limits=TOKEN_LIMITS,
         tile_count=len(HEX_COORDS),
     )
+
+
+@app.get("/random-board")
+def random_board():
+    tiles = generate_random_board()
+    return jsonify({"tiles": tiles})
 
 
 @app.post("/analyze")
