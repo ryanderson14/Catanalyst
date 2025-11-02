@@ -35,8 +35,8 @@ PROBABILITY_WEIGHTS = {
     3: 2,
     4: 3,
     5: 4,
-    6: 5,
-    8: 5,
+    6: 6,
+    8: 6,
     9: 4,
     10: 3,
     11: 2,
@@ -72,8 +72,8 @@ VERTEX_NEIGHBORS: Dict[int, Tuple[int, ...]] = {}
 
 
 def axial_to_pixel(q: int, r: int, size: float = 1.0) -> Tuple[float, float]:
-    x = size * math.sqrt(3) * (q + r / 2)
-    y = size * 1.5 * r
+    x = size * 1.5 * q
+    y = size * math.sqrt(3) * (r + q / 2)
     return x, y
 
 
@@ -81,7 +81,7 @@ def hex_corner_points(q: int, r: int) -> List[Tuple[float, float]]:
     cx, cy = axial_to_pixel(q, r)
     corners = []
     for i in range(6):
-        angle = math.radians(60 * i - 30)
+        angle = math.radians(60 * i)
         corners.append((cx + math.cos(angle), cy + math.sin(angle)))
     return corners
 
@@ -274,12 +274,22 @@ def index():
         {"id": idx, "display": idx + 1, "q": coord[0], "r": coord[1]}
         for idx, coord in enumerate(HEX_COORDS)
     ]
+    vertices = [
+        {
+            "id": vertex.index,
+            "x": vertex.x,
+            "y": vertex.y,
+            "tiles": [tile + 1 for tile in vertex.tiles],
+        }
+        for vertex in VERTICES
+    ]
     return render_template(
         "index.html",
         tiles=tiles,
         resource_limits=RESOURCE_LIMITS,
         token_limits=TOKEN_LIMITS,
         tile_count=len(HEX_COORDS),
+        vertices=vertices,
     )
 
 

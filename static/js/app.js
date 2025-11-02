@@ -8,6 +8,10 @@ const boardElement = document.getElementById('board');
 const analyzeButton = document.getElementById('analyze-button');
 const randomizeButton = document.getElementById('randomize-button');
 const clearBoardButton = document.getElementById('clear-board');
+const vertexOverlayElement = document.getElementById('vertex-overlay');
+const helpButton = document.getElementById('help-button');
+const helpPopover = document.getElementById('help-popover');
+const closeHelpButton = document.getElementById('close-help');
 
 const messagePanel = document.getElementById('message-panel');
 const messagesList = document.getElementById('messages');
@@ -33,6 +37,7 @@ const HEX_RADIUS = parseFloat(rootStyles.getPropertyValue('--hex-radius')) || 60
 const HEX_DIAMETER = HEX_RADIUS * 2;
 const HEX_HEIGHT = Math.sqrt(3) * HEX_RADIUS;
 const BOARD_PADDING = HEX_RADIUS * 1.6;
+const HELP_STORAGE_KEY = 'catanalyst_help_dismissed';
 
 const tiles = Array.from(document.querySelectorAll('.hex-tile'))
   .map((element) => ({
@@ -45,6 +50,18 @@ const tiles = Array.from(document.querySelectorAll('.hex-tile'))
   }))
   .sort((a, b) => a.id - b.id);
 
+const vertices = (config.vertices || []).map((vertex) => ({
+  id: Number(vertex.id),
+  x: Number(vertex.x),
+  y: Number(vertex.y),
+  tiles: Array.isArray(vertex.tiles)
+    ? vertex.tiles.map((value) => Number(value) - 1).filter((value) => value >= 0)
+    : [],
+  element: null,
+}));
+
+const vertexLookup = new Map(vertices.map((vertex) => [vertex.id, vertex]));
+
 const resourceCounts = Object.fromEntries(
   Object.keys(resourceLimits).map((resource) => [resource, 0])
 );
@@ -55,11 +72,44 @@ const tokenCounts = Object.fromEntries(
 let editingTileId = null;
 let editorResource = null;
 let editorToken = null;
+let boardBounds = { minX: 0, minY: 0, width: 0, height: 0 };
 
 function axialToPixel(q, r) {
-  const x = HEX_RADIUS * Math.sqrt(3) * (q + r / 2);
-  const y = HEX_RADIUS * 1.5 * r;
+  const x = HEX_RADIUS * 1.5 * q;
+  const y = HEX_RADIUS * Math.sqrt(3) * (r + q / 2);
   return { x, y };
+}
+
+function initVertexMarkers() {
+  if (!vertexOverlayElement) {
+    return;
+  }
+  vertexOverlayElement.innerHTML = '';
+  vertices.forEach((vertex) => {
+    const marker = document.createElement('span');
+    marker.className = 'vertex-node';
+    marker.dataset.vertex = vertex.id;
+    vertexOverlayElement.appendChild(marker);
+    vertex.element = marker;
+  });
+}
+
+function positionVertexMarkers(bounds) {
+  if (!vertexOverlayElement) {
+    return;
+  }
+  const { minX, minY } = bounds;
+  vertices.forEach((vertex) => {
+    if (!vertex.element) {
+      return;
+    }
+    const px = vertex.x * HEX_RADIUS;
+    const py = vertex.y * HEX_RADIUS;
+    const offsetX = px - minX + BOARD_PADDING;
+    const offsetY = py - minY + BOARD_PADDING;
+    vertex.element.style.left = `${offsetX}px`;
+    vertex.element.style.top = `${offsetY}px`;
+  });
 }
 
 function layoutBoard() {
@@ -81,6 +131,7 @@ function layoutBoard() {
   const width = maxX - minX + BOARD_PADDING * 2;
   const height = maxY - minY + BOARD_PADDING * 2;
 
+  boardBounds = { minX, minY, width, height };
   boardElement.style.width = `${width}px`;
   boardElement.style.height = `${height}px`;
 
@@ -90,6 +141,111 @@ function layoutBoard() {
     const offsetY = pos.y - minY + BOARD_PADDING;
     tile.element.style.left = `${offsetX - HEX_DIAMETER / 2}px`;
     tile.element.style.top = `${offsetY - HEX_HEIGHT / 2}px`;
+  });
+
+  if (vertexOverlayElement) {
+    vertexOverlayElement.style.width = `${width}px`;
+    vertexOverlayElement.style.height = `${height}px`;
+    positionVertexMarkers(boardBounds);
+  }
+}
+
+function clearVertexHighlights() {
+  vertices.forEach((vertex) => {
+    if (vertex.element) {
+      vertex.element.classList.remove('highlighted');
+    }
+  });
+  tiles.forEach((tile) => {
+    tile.element.classList.remove('highlighted');
+  });
+}
+
+function highlightVerticesOnBoard(vertexIds) {
+  if (!Array.isArray(vertexIds) || vertexIds.length === 0) {
+    clearVertexHighlights();
+    return;
+  }
+  const unique = new Set(vertexIds);
+  clearVertexHighlights();
+  unique.forEach((vertexId) => {
+    const vertex = vertexLookup.get(vertexId);
+    if (!vertex) {
+      return;
+    }
+    if (vertex.element) {
+      vertex.element.classList.add('highlighted');
+    }
+    vertex.tiles.forEach((tileId) => {
+      const tile = tiles[tileId];
+      if (tile) {
+        tile.element.classList.add('highlighted');
+      }
+    });
+  });
+}
+
+function attachRecommendationHover(element, vertexIds) {
+  if (!element) {
+    return;
+  }
+  const ids = Array.isArray(vertexIds) ? vertexIds.slice() : [];
+  if (!element.hasAttribute('tabindex')) {
+    element.tabIndex = 0;
+  }
+  element.addEventListener('mouseenter', () => highlightVerticesOnBoard(ids));
+  element.addEventListener('focusin', () => highlightVerticesOnBoard(ids));
+  element.addEventListener('mouseleave', () => clearVertexHighlights());
+  element.addEventListener('focusout', () => clearVertexHighlights());
+}
+
+function showHelpPopover() {
+  if (!helpPopover) {
+    return;
+  }
+  helpPopover.classList.remove('hidden');
+  helpPopover.setAttribute('aria-hidden', 'false');
+  if (helpButton) {
+    helpButton.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function hideHelpPopover(persist = false) {
+  if (!helpPopover) {
+    return;
+  }
+  if (!helpPopover.classList.contains('hidden')) {
+    helpPopover.classList.add('hidden');
+  }
+  helpPopover.setAttribute('aria-hidden', 'true');
+  if (helpButton) {
+    helpButton.setAttribute('aria-expanded', 'false');
+  }
+  if (persist) {
+    try {
+      localStorage.setItem(HELP_STORAGE_KEY, '1');
+    } catch (error) {
+      /* ignore storage errors */
+    }
+  }
+}
+
+function initializeHelpPopover() {
+  if (!helpPopover) {
+    return;
+  }
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(HELP_STORAGE_KEY) === '1';
+  } catch (error) {
+    dismissed = false;
+  }
+  if (dismissed) {
+    hideHelpPopover(false);
+    return;
+  }
+  requestAnimationFrame(() => {
+    showHelpPopover();
   });
 }
 
@@ -322,6 +478,7 @@ function clearBoard() {
   });
   resetCounts();
   clearMessages();
+  clearVertexHighlights();
   resultsGrid.hidden = true;
   resultsEmpty.hidden = false;
 }
@@ -341,6 +498,7 @@ function applyRandomTiles(randomTiles) {
   });
   resetCounts();
   clearMessages();
+  clearVertexHighlights();
   resultsGrid.hidden = true;
   resultsEmpty.hidden = false;
 }
@@ -386,34 +544,39 @@ function showMessages(messages) {
 function renderVertexEntry(entry) {
   const li = document.createElement('li');
   const resourceList = entry.resources.map(titleCase).join(', ');
+  const cornerLabel = `Corner ${entry.vertex + 1}`;
   li.innerHTML = `
-    <span class="score">Score ${entry.score}</span>
+    <span class="score">${cornerLabel} · Score ${entry.score}</span>
     <span class="meta">Touches tiles ${entry.tiles.join(', ')}</span>
     <span class="resources">${resourceList}</span>
   `;
+  li.dataset.vertexIds = String(entry.vertex);
   return li;
 }
 
 function renderPairEntry(entry) {
   const li = document.createElement('li');
   const resources = entry.resources.map(titleCase).join(', ');
-  const description = entry.vertices
+  const verticesSummary = entry.vertices
     .map(
       (vertex) =>
         `Corner ${vertex.vertex + 1} (tiles ${vertex.tiles.join(', ')}, score ${vertex.score})`
     )
     .join(' &amp; ');
+  const vertexIds = entry.vertices.map((vertex) => vertex.vertex);
   li.innerHTML = `
     <span class="score">Pair score ${entry.score}</span>
-    <span class="meta">${description}</span>
+    <span class="meta">${verticesSummary}</span>
     <span class="resources">Combined resources: ${resources}</span>
   `;
+  li.dataset.vertexIds = vertexIds.join(',');
   return li;
 }
 
 async function analyzeBoard() {
   try {
     clearMessages();
+    clearVertexHighlights();
     const response = await fetch('/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -436,12 +599,15 @@ async function analyzeBoard() {
     vertices.forEach((entry) => {
       const item = renderVertexEntry(entry);
       topVerticesList.appendChild(item);
+      attachRecommendationHover(item, [entry.vertex]);
     });
 
     topPairsList.innerHTML = '';
     pairs.forEach((entry) => {
       const item = renderPairEntry(entry);
       topPairsList.appendChild(item);
+      const pairVertexIds = entry.vertices.map((vertex) => vertex.vertex);
+      attachRecommendationHover(item, pairVertexIds);
     });
 
     resultsEmpty.hidden = true;
@@ -498,14 +664,37 @@ function bindEvents() {
     analyzeButton.addEventListener('click', analyzeBoard);
   }
 
+  if (helpButton && helpPopover) {
+    helpButton.addEventListener('click', () => {
+      const isHidden = helpPopover.classList.contains('hidden');
+      if (isHidden) {
+        showHelpPopover();
+      } else {
+        hideHelpPopover(true);
+      }
+    });
+  }
+
+  if (closeHelpButton) {
+    closeHelpButton.addEventListener('click', () => hideHelpPopover(true));
+  }
+
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !editorOverlay.classList.contains('hidden')) {
       closeEditor();
     }
+    if (event.key === 'Escape' && helpPopover && !helpPopover.classList.contains('hidden')) {
+      hideHelpPopover(true);
+    }
   });
 }
 
+initVertexMarkers();
 layoutBoard();
 resetCounts();
 bindEvents();
+initializeHelpPopover();
+window.addEventListener('resize', () => {
+  layoutBoard();
+});
 

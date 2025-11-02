@@ -17,21 +17,15 @@
       <header class="page-header">
         <div class="page-header__copy">
           <h1>Catanalyst</h1>
-          <p>Design a legal Settlers of Catan board and pinpoint the smartest opening settlements.</p>
-          <p class="page-header__hint">
-            Hover or tap any hex to open the tile editor. Pick a terrain, then choose its number token &mdash;
-            we'll guard the official counts automatically.
+          <p>
+            Design an official Settlers of Catan board, then let the assistant spotlight the smartest opening
+            settlements based on number probabilities and resource coverage.
           </p>
-        </div>
-        <div class="page-header__actions">
-          <button class="primary" id="analyze-button" type="button" title="Run settlement analysis">
-            Analyze settlements
-          </button>
         </div>
       </header>
 
-      <main class="main-layout">
-        <section class="board-section">
+      <main class="workspace">
+        <section class="board-column" aria-label="Catan board editor">
           <div class="board-frame">
             <div
               class="board-canvas"
@@ -52,58 +46,89 @@
                 <span class="tile-token" data-role="token"></span>
               </button>
               {% endfor %}
+              <div class="vertex-overlay" id="vertex-overlay" aria-hidden="true"></div>
             </div>
           </div>
-        </section>
-        <aside class="side-panel">
-          <div class="card">
-            <h2>How it works</h2>
-            <p>
-              Click a hex to open the tile editor. Choose a terrain tile and, if applicable, its number token.
-              Limits for resources and numbers are enforced automatically so every configuration stays legal.
-            </p>
-            <p>
-              Want inspiration? Generate a balanced board instantly and tweak any pieces before running the
-              analysis.
-            </p>
-          </div>
-          <div class="card actions-card">
+          <div class="board-toolbar">
             <button id="randomize-button" type="button" class="secondary">Random valid board</button>
             <button id="clear-board" type="button" class="ghost">Clear all tiles</button>
           </div>
-          <div class="card" id="message-panel" hidden>
-            <h2>Validation</h2>
-            <ul class="message-list" id="messages"></ul>
+        </section>
+
+        <aside class="assistant-column" aria-label="Strategic assistant">
+          <div class="assistant-header">
+            <div class="assistant-copy">
+              <h2>Strategic assistant</h2>
+              <p>Complete the board, then analyze to reveal the strongest settlement corners and opening pairs.</p>
+            </div>
+            <div class="assistant-controls">
+              <button
+                class="icon-button"
+                id="help-button"
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                title="How to use Catanalyst"
+              >
+                <span class="icon">?</span>
+              </button>
+              <button class="primary" id="analyze-button" type="button" title="Run settlement analysis">
+                Analyze settlements
+              </button>
+            </div>
+          </div>
+
+          <div class="assistant-body">
+            <div class="card" id="message-panel" hidden>
+              <h3>Validation</h3>
+              <ul class="message-list" id="messages"></ul>
+            </div>
+
+            <div class="card results-card" id="results-container">
+              <div class="results-empty" id="results-empty">
+                <h3>Ready when you are</h3>
+                <p>
+                  Hover or tap a hex to open the tile editor. Choose a terrain, then set its number token &mdash;
+                  the assistant enforces the official counts for you. Press <strong>Analyze settlements</strong>
+                  to surface priority intersections and opening pairs. Hover a recommendation to spotlight it on the
+                  board.
+                </p>
+              </div>
+              <div class="results-grid" id="results-grid" hidden>
+                <div class="result-column">
+                  <h3>Top settlement spots</h3>
+                  <ol id="top-vertices"></ol>
+                </div>
+                <div class="result-column">
+                  <h3>Best starting pairs</h3>
+                  <ol id="top-pairs"></ol>
+                </div>
+              </div>
+            </div>
           </div>
         </aside>
       </main>
 
-      <section class="results" id="results" aria-live="polite">
-        <div class="results-empty" id="results-empty">
-          <h2>Your strategic assistant</h2>
-          <p>
-            Complete the board and press <strong>Analyze settlements</strong> to surface the strongest
-            intersections plus the best opening settlement pairs by probability and resource coverage.
-          </p>
-        </div>
-        <div class="results-grid" id="results-grid" hidden>
-          <div class="result-card">
-            <h2>Top settlement spots</h2>
-            <ol id="top-vertices"></ol>
-          </div>
-          <div class="result-card">
-            <h2>Best starting pairs</h2>
-            <ol id="top-pairs"></ol>
-          </div>
-        </div>
-      </section>
-
       <footer class="page-footer">
         <p>
-          Crafted with ❤️ to make your Catan openings smarter. Experiment freely &mdash; the assistant keeps
-          every board configuration within the official rules.
+          Crafted with ❤️ to make your Catan openings smarter. Experiment freely &mdash; the assistant keeps every
+          board configuration within the official rules.
         </p>
       </footer>
+    </div>
+
+    <div class="help-popover hidden" id="help-popover" role="dialog" aria-modal="false" aria-hidden="true">
+      <div class="help-popover__inner">
+        <button class="icon-button close" id="close-help" type="button" aria-label="Close help panel">
+          &times;
+        </button>
+        <h2>How to use Catanalyst</h2>
+        <ul>
+          <li>Click any hex to set its terrain and number token. Official tile and token counts are enforced.</li>
+          <li>Need inspiration? Generate a random legal layout or clear the board to start fresh.</li>
+          <li>Hover results to highlight the recommended intersections directly on the board.</li>
+        </ul>
+      </div>
     </div>
 
     <div class="editor-overlay hidden" id="tile-editor" role="dialog" aria-modal="true">
@@ -150,6 +175,7 @@
         resourceLimits: {{ resource_limits|tojson }},
         tokenLimits: {{ token_limits|tojson }},
         tileCount: {{ tile_count }},
+        vertices: {{ vertices|tojson }},
       };
     </script>
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
